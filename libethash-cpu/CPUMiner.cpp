@@ -1,18 +1,18 @@
 /*
-This file is part of progminer.
+This file is part of veilminer.
 
-progminer is free software: you can redistribute it and/or modify
+veilminer is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-progminer is distributed in the hope that it will be useful,
+veilminer is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with progminer.  If not, see <http://www.gnu.org/licenses/>.
+along with veilminer.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /*
@@ -220,7 +220,7 @@ bool CPUMiner::initEpoch_internal()
    Miner should stop working on the current block
    This happens if a
      * new work arrived                       or
-     * miner should stop (eg exit progminer)   or
+     * miner should stop (eg exit veilminer)   or
      * miner should pause
 */
 void CPUMiner::kick_miner()
@@ -236,7 +236,7 @@ void CPUMiner::search(const dev::eth::WorkPackage& w)
 
     const auto& context = progpow::get_global_epoch_context_full(w.epoch);
     auto header = progpow::hash256_from_bytes(w.header.data());
-    auto boundary = progpow::hash256_from_bytes(w.boundary.data());
+    auto boundary = progpow::hash256_from_bytes(w.get_boundary().data());
     auto nonce = w.startNonce;
 
     while (true)

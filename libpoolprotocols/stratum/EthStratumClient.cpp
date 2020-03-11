@@ -1,6 +1,8 @@
-#include <progminer/buildinfo.h>
+#include <veilminer/buildinfo.h>
 #include <libdevcore/Log.h>
 #include <ethash/ethash.hpp>
+#include <libpoolprotocols/stratum/arith_uint256.h>
+
 
 #include "EthStratumClient.h"
 
@@ -539,7 +541,7 @@ void EthStratumClient::connect_handler(const boost::system::error_code& ec)
 #endif
                 cwarn << "* Double check hostname in the -P argument.";
                 cwarn << "* Disable certificate verification all-together via environment "
-                         "variable. See progminer --help for info about environment variables";
+                         "variable. See veilminer --help for info about environment variables";
                 cwarn << "If you do the latter please be advised you might expose yourself to the "
                          "risk of seeing your shares stolen";
             }
@@ -614,7 +616,7 @@ void EthStratumClient::connect_handler(const boost::system::error_code& ec)
 
     case EthStratumClient::ETHEREUMSTRATUM:
 
-        jReq["params"].append(progminer_get_buildinfo()->project_name_with_version);
+        jReq["params"].append(veilminer_get_buildinfo()->project_name_with_version);
         jReq["params"].append("EthereumStratum/1.0.0");
 
         break;
@@ -623,7 +625,7 @@ void EthStratumClient::connect_handler(const boost::system::error_code& ec)
 
         jReq["method"] = "mining.hello";
         Json::Value jPrm;
-        jPrm["agent"] = progminer_get_buildinfo()->project_name_with_version;
+        jPrm["agent"] = veilminer_get_buildinfo()->project_name_with_version;
         jPrm["host"] = m_conn->Host();
         jPrm["port"] = toCompactHex((uint32_t)m_conn->Port(), HexPrefix::DontAdd);
         jPrm["proto"] = "EthereumStratum/2.0.0";
@@ -744,7 +746,7 @@ void EthStratumClient::processResponse(Json::Value& responseObject)
         (_isNotification && (responseObject["params"].empty() && responseObject["result"].empty())))
     {
         cwarn << "Pool sent an invalid jsonrpc message...";
-        cwarn << "Do not blame progminer for this. Ask pool devs to honor http://www.jsonrpc.org/ "
+        cwarn << "Do not blame veilminer for this. Ask pool devs to honor http://www.jsonrpc.org/ "
                  "specifications ";
         cwarn << "Disconnecting...";
         m_io_service.post(m_io_strand.wrap(boost::bind(&EthStratumClient::disconnect, this)));
@@ -1293,7 +1295,6 @@ void EthStratumClient::processResponse(Json::Value& responseObject)
                 prmIdx = 1;
             }
 
-
             if (jPrm.isArray() && !jPrm.empty())
             {
                 m_current.job = jPrm.get(Json::Value::ArrayIndex(0), "").asString();
@@ -1323,20 +1324,17 @@ void EthStratumClient::processResponse(Json::Value& responseObject)
                 {
                     string sHeaderHash = jPrm.get(Json::Value::ArrayIndex(prmIdx++), "").asString();
                     string sSeedHash = jPrm.get(Json::Value::ArrayIndex(prmIdx++), "").asString();
-                    string sShareTarget =
-                        jPrm.get(Json::Value::ArrayIndex(prmIdx++), "").asString();
+                    string sShareTarget = jPrm.get(Json::Value::ArrayIndex(prmIdx++), "").asString();
+                    bool fCancelJob = jPrm.get(Json::Value::ArrayIndex(prmIdx++), "").asBool();
+                    uint64_t iBlockHeight = jPrm.get(Json::Value::ArrayIndex(prmIdx++), "").asInt64();
+                    uint32_t nBlockTargetBits =  strtoul(jPrm.get(Json::Value::ArrayIndex(prmIdx++), "").asString().c_str(), nullptr, 16);
 
-                    // check block number info
-                    m_current.block = -1;
-                    if (jPrm.size() > prmIdx &&
-                        jPrm.get(Json::Value::ArrayIndex(prmIdx), "").asString().substr(0, 2) ==
-                            "0x")
+                    arith_uint256 hashTarget = arith_uint256().SetCompact(nBlockTargetBits);
+                    std::string sBlockTarget = hashTarget.GetHex();
+
                     {
                         try
                         {
-                            m_current.block =
-                                std::stoul(jPrm.get(Json::Value::ArrayIndex(prmIdx), "").asString(),
-                                    nullptr, 16);
                             /*
                             check if the block number is in a valid range
                             A year has ~31536000 seconds
@@ -1344,7 +1342,7 @@ void EthStratumClient::processResponse(Json::Value& responseObject)
                             assuming a (very fast) blocktime of 10s:
                             ==> in 50 years we get 157680000 (=0x9660180) blocks
                             */
-                            if (m_current.block > 0x9660180)
+                            if (iBlockHeight > 0x9660180)
                                 throw new std::exception();
                         }
                         catch (const std::exception&)
@@ -1361,7 +1359,10 @@ void EthStratumClient::processResponse(Json::Value& responseObject)
                     m_current.seed = h256(sSeedHash);
                     m_current.header = h256(sHeaderHash);
                     m_current.boundary = h256(sShareTarget);
+                    m_current.block_boundary = h256(sBlockTarget);
                     m_current_timestamp = std::chrono::steady_clock::now();
+                    m_current.startNonce = m_session->extraNonce;
+                    m_current.block = iBlockHeight;
 
                     // This will signal to dispatch the job
                     // at the end of the transmission.
@@ -1491,6 +1492,14 @@ void EthStratumClient::processResponse(Json::Value& responseObject)
             if (!enonce.empty())
                 processExtranonce(enonce);
         }
+        else if (_method == "mining.set_target") {
+            jPrm = responseObject.get("params", Json::Value::null);
+            prmIdx = 0;
+
+            string sShareTarget = jPrm.get(Json::Value::ArrayIndex(prmIdx), "").asString();
+            m_current.boundary = h256(sShareTarget);
+            cnote << "New target set to: "  << sShareTarget;
+        }
         else if (_method == "mining.bye" && m_conn->StratumMode() == ETHEREUMSTRATUM2)
         {
             cnote << m_conn->Host() << " requested connection close. Disconnecting ...";
@@ -1499,7 +1508,7 @@ void EthStratumClient::processResponse(Json::Value& responseObject)
         else if (_method == "client.get_version")
         {
             jReq["id"] = _id;
-            jReq["result"] = progminer_get_buildinfo()->project_name_with_version;
+            jReq["result"] = veilminer_get_buildinfo()->project_name_with_version;
 
             if (_rpcVer == 1)
             {
@@ -1593,7 +1602,7 @@ void EthStratumClient::submitSolution(const Solution& solution)
     case EthStratumClient::STRATUM:
 
         jReq["jsonrpc"] = "2.0";
-        jReq["params"].append(m_conn->User());
+        jReq["params"].append(m_conn->UserDotWorker());
         jReq["params"].append(solution.work.job);
         jReq["params"].append(toHex(solution.nonce, HexPrefix::Add));
         jReq["params"].append(solution.work.header.hex(HexPrefix::Add));

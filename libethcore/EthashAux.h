@@ -1,18 +1,18 @@
 /*
-    This file is part of progminer.
+    This file is part of veilminer.
 
-    progminer is free software: you can redistribute it and/or modify
+    veilminer is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    progminer is distributed in the hope that it will be useful,
+    veilminer is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with progminer.  If not, see <http://www.gnu.org/licenses/>.
+    along with veilminer.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #pragma once
@@ -61,6 +61,17 @@ struct WorkPackage
     h256 boundary;
     h256 header;  ///< When h256() means "pause until notified a new work package is available".
     h256 seed;
+    h256 block_boundary;
+
+    h256 get_boundary() const
+    {
+        if (block_boundary == h256{})
+            return boundary;
+        else if (boundary < block_boundary)
+            return block_boundary;
+        else
+            return boundary;
+    }
 
     int epoch = -1;
     int block = -1;

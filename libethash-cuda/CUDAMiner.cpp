@@ -1,18 +1,18 @@
 /*
-This file is part of progminer.
+This file is part of veilminer.
 
-progminer is free software: you can redistribute it and/or modify
+veilminer is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-progminer is distributed in the hope that it will be useful,
+veilminer is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with progminer.  If not, see <http://www.gnu.org/licenses/>.
+along with veilminer.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <fstream>
@@ -244,7 +244,7 @@ void CUDAMiner::workLoop()
             // Persist most recent job.
             // Job's differences should be handled at higher level
             current = w;
-            uint64_t upper64OfBoundary = (uint64_t)(u64)((u256)current.boundary >> 192);
+            uint64_t upper64OfBoundary = (uint64_t)(u64)((u256)w.get_boundary() >> 192);
 
             // Eventually start searching
             search(current.header.data(), upper64OfBoundary, current.startNonce, w);

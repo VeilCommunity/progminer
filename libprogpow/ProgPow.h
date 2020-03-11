@@ -20,6 +20,8 @@
 // random math instructions per loop
 #define PROGPOW_CNT_MATH        18
 
+#define EPOCH_LENGTH            5625
+
 class ProgPow
 {
 public:
